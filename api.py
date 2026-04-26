@@ -27,6 +27,16 @@ import traceback
 from datetime import datetime
 from bioreactor_simulator import CHOBioreactorSimulator
 
+# Optional GPT-4.1 agent integration. Imported lazily so the API still
+# starts even if openai/dotenv aren't installed or .env is missing.
+try:
+    from agent_runner import run_agent_for_run as _gpt_agent_for_run
+    _AGENT_AVAILABLE = True
+except Exception as _agent_import_err:
+    print(f"[INIT] Agent runner unavailable, using derived events: {_agent_import_err}")
+    _gpt_agent_for_run = None
+    _AGENT_AVAILABLE = False
+
 app = Flask(__name__)
 CORS(app)  # allow frontend on localhost:5173
 
@@ -209,11 +219,25 @@ def create_run():
         history   = sim.run_full_simulation()
         summary   = sim.get_titer_summary()
         agent_log = _derive_agent_log(history)
+
+        # Pre-generate run_id so agent log can reference it consistently
+        run_id = f"run_{uuid.uuid4().hex[:8]}"
+
+        # If GPT-4.1 agent is available, replace the derived log with real
+        # agent decisions. Falls back to derived on any failure so the
+        # demo never breaks if the OpenAI API hiccups.
+        if _AGENT_AVAILABLE and _gpt_agent_for_run is not None:
+            try:
+                gpt_events = _gpt_agent_for_run(history, run_id)
+                if gpt_events:  # only swap if agent actually produced events
+                    agent_log = gpt_events
+                    print(f"[INIT] {run_id}: using {len(gpt_events)} GPT-4.1 events")
+            except Exception as e:
+                print(f"[INIT] {run_id}: agent failed, using derived events: {e}")
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
-    run_id = f"run_{uuid.uuid4().hex[:8]}"
     RUNS[run_id] = {
         "run_id":     run_id,
         "config":     {"n_reactors": n_reactors, "run_days": run_days,
@@ -417,4 +441,4 @@ if __name__ == "__main__":
     print("  GET  /api/runs")
     print("Legacy: /api/health /api/simulate /api/readings /api/step")
     print("CORS enabled for localhost frontend.")
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
