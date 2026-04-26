@@ -1,0 +1,32 @@
+Test run started at Sat Apr 25 23:16:44 PDT 2026
+npm warn Unknown project config "always-auth". This will stop working in the next major version of npm.
+
+> @joint/bioreactor-agent@1.0.0 test:run
+> vitest run --reporter=verbose
+
+
+ RUN  v3.2.4 /Users/bahran/Desktop/scsp/side-proj/scada/js
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/regression.test.ts [ src/regression.test.ts ]
+TypeError: dia.ElementView.addPresentationAttributes is not a function
+ ❯ src/components/ScadaVisualization/scada-init.ts:58:43
+     56| 
+     57| export const PumpView = dia.ElementView.extend({
+     58|   presentationAttributes: dia.ElementView.addPresentationAttributes({ …
+       |                                           ^
+     59|   initFlag: [dia.ElementView.Flags.RENDER, POWER_FLAG],
+     60|   confirmUpdate(...args: unknown[]) {
+ ❯ src/regression.test.ts:3:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  23:16:45
+   Duration  482ms (transform 44ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 150ms)
+
+Test completed successfully at Sat Apr 25 23:16:46 PDT 2026

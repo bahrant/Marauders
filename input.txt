@@ -1,0 +1,45 @@
+Section	Parameter Label	Input Type	Default Value	Min	Max	Data Reference
+RUN CONFIG,	Run Name	Text field	CHO-Run-001	—	—	—
+
+RUN CONFIG,	Cell Line	Dropdown	CHO-K1	—	—	—
+RUN CONFIG,	Number of Reactors	Drag to canvas (1–8)	4	1	8	Sheet: Multi-Reactor Comparison
+RUN CONFIG,	Run Duration (days)	Number input	14	7	21	Sheet: Fed-Batch Time Course
+RUN CONFIG,	Target Titer (g/L)	Number input	3.0	1.0	16.0	Sheet: Kinetic Parameters — Titer Benchmarks
+RUN CONFIG,	Seeding Density (×10⁶ cells/mL)	Number input	0.5	0.3	1.0	Sheet: Kinetic Parameters
+
+
+
+CATEGORY: PROCESS SETPOINTS, pH Range	Dual range slider	6.8 – 7.2	6.5	7.5	Sheet: Probe Thresholds
+
+PROCESS SETPOINTS,	Dissolved Oxygen (%) Dual range slider	30 – 60	20	80	Sheet: Probe Thresholds
+PROCESS SETPOINTS,	Temperature (°C)	 Dual range slider	36.5 – 37.5	35.0	40.0	Sheet: Probe Thresholds
+PROCESS SETPOINTS,	Glucose Floor (g/L) 	Number input	0.9	0.5	5.0	Sheet: Kinetic Parameters
+PROCESS SETPOINTS,	Lactate Ceiling (g/L)	 Number input	1.8	0.5	3.0	Sheet: Probe Thresholds
+PROCESS SETPOINTS,	Osmolality Max (mOsm/kg)	Number input	390	280	450	Sheet: Probe Thresholds
+PROCESS SETPOINTS,	pCO2 Max (mmHg)	Number input	150	20	200	Sheet: Probe Thresholds
+
+
+FEED STRATEGY,	Feed Mode (per reactor)	Line type on canvas (solid=bolus, dashed=continuous)	Bolus	—	—	Sheet: Multi-Reactor Comparison
+FEED STRATEGY,	Bolus Feed Days	Multi-select or auto	3, 5, 7, 9	—	—	Sheet: Kinetic Parameters
+FEED STRATEGY,	Temperature Shift	Toggle token drag onto reactor	Off	—	—	Sheet: Multi-Reactor Comparison
+FEED STRATEGY,	Temp Shift Day	Number (if toggle on)	7	3	12	Sheet: Multi-Reactor Comparison
+FEED STRATEGY,	Post-Shift Temperature (°C)	Number (if toggle on)	33.0	31.0	35.0	Sheet: Kinetic Parameters
+
+
+AGENT AUTONOMY,	Autonomy Level	3-way radio toggle	Full Auto	—	—	—
+AGENT AUTONOMY,	Escalation Threshold (# warnings)	Number input	2	1	5	—
+AGENT AUTONOMY,	Sampling Interval	Dropdown	30 min	—	—	Sheet: Fed-Batch Time Course
+AGENT AUTONOMY,	Alert Role	Dropdown (Scientist / Supervisor / Both)	Scientist	—	—	—
+
+
+KALMAN FILTER,	Filter Mode (per probe)	Toggle (Standard / Adaptive)	Adaptive	—	—	Sheet: Probe Thresholds
+KALMAN FILTER,	Fault Sensitivity	3-way slider (Conservative/Balanced/Aggressive)	Balanced	—	—	Sheet: Probe Thresholds
+KALMAN FILTER,	Probe Trust Floor	Slider 0.0–1.0	0.4	0.1	0.9	Sheet: Probe Thresholds
+KALMAN FILTER,	Monitor: Spike faults	Checkbox (default on)	On	—	—	Sheet: Probe Thresholds
+KALMAN FILTER,	Monitor: Drift faults	Checkbox (default on)	On	—	—	Sheet: Probe Thresholds
+KALMAN FILTER,	Monitor: Frozen sensor	Checkbox (default on)	On	—	—	Sheet: Probe Thresholds
+KALMAN FILTER,	Monitor: Fouling	Checkbox (default on)	On	—	—	Sheet: Probe Thresholds
+DISPLAY	Chart Time Window	Dropdown (Last 24hr / 48hr / Full run)	Full run	—	—	Sheet: Fed-Batch Time Course
+DISPLAY	Alert Severity Filter	Multi-select (CRITICAL / WARNING / INFO)	All	—	—	Sheet: Probe Thresholds
+DISPLAY	Show/Hide Reactor	Checkbox per reactor	All shown	—	—	—
+DISPLAY	Report Export Format	Dropdown (Markdown / JSON / CSV)	Markdown	—	—	—

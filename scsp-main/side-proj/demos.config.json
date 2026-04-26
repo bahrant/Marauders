@@ -1,0 +1,24 @@
+{
+  "demos": {
+    "bpmn-camunda-integration": {
+      "skip": true
+    },
+    "chatbot": {
+      "variant": "vue-ts"
+    },
+    "framework-element-view": {
+      "variant": "angular",
+      "buildFlags": "--configuration production"
+    },
+    "data-pipeline": {
+      "variant": "angular",
+      "buildFlags": "--configuration production"
+    },
+    "tabs": {
+      "variant": "react"
+    },
+    "diagram-index": {
+      "variant": "react"
+    }
+  }
+}
