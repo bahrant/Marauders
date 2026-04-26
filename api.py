@@ -417,4 +417,4 @@ if __name__ == "__main__":
     print("  GET  /api/runs")
     print("Legacy: /api/health /api/simulate /api/readings /api/step")
     print("CORS enabled for localhost frontend.")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
