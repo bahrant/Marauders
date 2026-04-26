@@ -43,6 +43,14 @@ YX_S         = 1.8e6     # cells/mL per g/L  Yield coefficient (cells per glucos
 ALPHA        = 7.65e-7   # µg/cell  Luedeking-Piret growth-associated constant
 BETA         = 7.68e-8   # µg/cell/h  Luedeking-Piret non-growth-associated constant
 
+# Specific productivity scaling for high-producer industrial CHO clones.
+# López-Meza 2016 fitted r-CHO (research clone, low producer ~1 pg/cell/day qP).
+# Industrial production clones (CHOK1SV GS-KO, etc.) routinely reach 10–50 pg/cell/day.
+# Frontiers Bioeng. 2023 reports 4.46–8.33 g/L fed-batch titers — these come from
+# high-producer clones, not research clones. Q_P_SCALE bridges López-Meza kinetics
+# to industrial clone productivity. Default 5 → ~5 pg/cell/day effective qP.
+Q_P_SCALE    = 5.0
+
 # ─── Process Thresholds (ISO / GxP / published limits) ───────────────────────
 THRESHOLDS = {
     "pH":            {"min": 6.8,  "max": 7.2,   "unit": ""},
@@ -177,9 +185,12 @@ class CHOBioreactorSimulator:
         Convert from µg/cell to g/L using VCD (×10⁶ cells/mL = ×10⁹ cells/L)
         """
         VCD_cells_per_L = VCD * 1e9  # ×10⁶ cells/mL → cells/L
-        dX_dt = mu * VCD_cells_per_L * self.dt
-        dmAb_dt = (ALPHA * dX_dt + BETA * VCD_cells_per_L) * 1e-9  # convert µg to g
-        return max(0, dmAb_dt)
+        # Growth-associated: ALPHA[µg/cell] * dX[cells/L] = µg/L over the timestep
+        # Non-growth-associated: BETA[µg/cell/h] * X[cells/L] * dt[h] = µg/L over the timestep
+        dX_step = mu * VCD_cells_per_L * self.dt   # cells/L produced this timestep
+        dmAb_ug_per_L = ALPHA * dX_step + BETA * VCD_cells_per_L * self.dt
+        dmAb_g_per_L = dmAb_ug_per_L * 1e-6 * Q_P_SCALE  # µg/L → g/L, scale to industrial qP
+        return max(0, dmAb_g_per_L)
 
     def _apply_feed(self, state: ReactorState, strategy: str) -> tuple:
         """
@@ -196,10 +207,12 @@ class CHOBioreactorSimulator:
                 return new_glucose, feed_event
 
         elif strategy == "continuous":
-            if state.glucose < 2.0:
-                boost = 1.5
+            # Maintain glucose above Monod Ks (0.929 g/L) for sustained growth.
+            # Real perfusion/continuous feed targets 3–5 g/L glucose maintenance.
+            if state.glucose < 3.0:
+                boost = 3.0 - state.glucose + 0.5  # restore to ~3.5 g/L
                 new_glucose = state.glucose + boost
-                feed_event = f"Day {day}: Continuous feed triggered (glucose {state.glucose:.2f} g/L) — +{boost} g/L"
+                feed_event = f"Day {day}: Continuous feed triggered (glucose {state.glucose:.2f} g/L) — +{boost:.2f} g/L"
                 return new_glucose, feed_event
 
         return state.glucose, None
@@ -217,13 +230,22 @@ class CHOBioreactorSimulator:
 
         # ── Growth kinetics (Monod) ────────────────────────────────────────
         mu = self._monod_growth_rate(state.glucose, state.temperature)
-        dX = mu * state.VCD * self.dt
-        state.VCD = min(state.VCD + dX + random.gauss(0, 0.08), 20.0)
+        dX_growth = mu * state.VCD * self.dt
+        # Death phase: viability decline removes viable cells from the population.
+        # When viability drops, dead cells are no longer counted in VCD.
+        # Loss rate is proportional to (1 - viability/100) and scaled to be
+        # negligible while healthy and meaningful past day 9-10 when viability falls.
+        viability_fraction = state.viability / 100.0
+        death_rate = 0.04 * (1.0 - viability_fraction) ** 1.5  # h⁻¹ effective
+        dX_death = death_rate * state.VCD * self.dt
+        state.VCD = state.VCD + dX_growth - dX_death + random.gauss(0, 0.08)
+        state.VCD = min(state.VCD, 20.0)
         state.VCD = max(0.1, state.VCD)
 
         # ── Glucose consumption ────────────────────────────────────────────
-        # Yield coefficient Yx/s: cells per g/L glucose consumed
-        glucose_consumed = dX / (YX_S * 1e-6)  # Convert to g/L
+        # Yield coefficient Yx/s: cells per g/L glucose consumed.
+        # Only growth (not death) consumes glucose.
+        glucose_consumed = dX_growth / (YX_S * 1e-6)  # Convert to g/L
         glucose_consumed = max(0, glucose_consumed + random.gauss(0, 0.05))
 
         # ── Feed application ───────────────────────────────────────────────
@@ -233,12 +255,14 @@ class CHOBioreactorSimulator:
             state.feed_events.append(feed_event)
 
         # ── Lactate dynamics ───────────────────────────────────────────────
-        # Lactate increases with glucose consumption, peaks then shifts
-        # Metabolic shift: lactate consumption after day 5-7 (PMC5656727)
+        # Phase 1 (early): lactate accumulates from glycolysis as cells grow
+        # Phase 2 (metabolic shift, day 6+): cells consume lactate as alt carbon source
+        # Reference data shows lactate peaking ~1.5 g/L day 5, declining to ~0.5 by day 14.
         if state.day < 6:
             dlactate = glucose_consumed * 0.4 + random.gauss(0, 0.03)
         else:
-            dlactate = -0.05 * state.lactate + random.gauss(0, 0.02)  # consumption phase
+            # Decay rate calibrated so lactate falls from ~1.5 to ~0.5 g/L over 8 days
+            dlactate = -0.15 * state.lactate + random.gauss(0, 0.02)
         state.lactate = max(0, state.lactate + dlactate)
 
         # ── Glutamine / Ammonia ────────────────────────────────────────────
@@ -273,8 +297,14 @@ class CHOBioreactorSimulator:
         )
 
         # ── Viability decay ────────────────────────────────────────────────
-        # Lactate inhibition and ammonia accumulation drive viability down
-        viability_loss = 0.3 * max(0, state.lactate - 1.0) + 0.5 * max(0, state.ammonia - 4.0)
+        # Three drivers of viability loss in CHO fed-batch:
+        #   (1) Lactate inhibition (1 g/L effective threshold)
+        #   (2) Ammonia toxicity (4 mM threshold, Borys 2015)
+        #   (3) Senescence — culture aging past day 8 (matches Frontiers 2023 trajectory)
+        lactate_loss   = 0.6 * max(0, state.lactate - 1.0)
+        ammonia_loss   = 0.7 * max(0, state.ammonia - 4.0)
+        senescence     = 1.5 if state.day > 8 else 0.0  # ~1.5%/day past day 8
+        viability_loss = lactate_loss + ammonia_loss + senescence
         state.viability = max(0, min(100, state.viability - viability_loss + random.gauss(0, 0.3)))
 
         # ── mAb titer (Luedeking-Piret) ────────────────────────────────────
