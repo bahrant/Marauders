@@ -13,6 +13,12 @@ Why replay mode (not closed-loop)?
 - Fast: 14 GPT-4.1 calls (~$0.20-0.30 per run) vs hundreds for closed-loop.
 - Demo-safe: no per-tick API latency.
 
+Rate-limit handling:
+- Free-tier OpenAI accounts cap at 30K tokens-per-minute (TPM).
+- Each day's call uses ~2K input + ~500 output tokens. 14 days = ~35K
+  tokens, which exceeds 30K TPM if fired back-to-back.
+- We throttle by sleeping after each call AND by retrying on 429.
+
 What this gives you to show judges:
 - "Every event in the agent_log was decided by GPT-4.1 using these 6 tools"
 - Per-event reasoning strings the LLM actually wrote
@@ -29,10 +35,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import uuid
 from datetime import datetime
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 
 # Reuse tool definitions + system-prompt building from agent.py.
@@ -41,6 +48,14 @@ from dotenv import load_dotenv
 from agent import tools as AGENT_TOOLS
 
 load_dotenv()
+
+# Per-day pacing. Approximate token math:
+#   Input: ~2K (system + snapshot of 4 reactors)
+#   Output: ~500 (tool calls + tiny reasoning)
+#   Worst case per day: ~3K tokens
+#   30,000 TPM / 3K per call = 10 calls/min = 6 sec/call minimum
+# Sleep 5 sec between days to stay safely under the limit.
+_INTER_DAY_SLEEP_SEC = 5.0
 
 # Single shared client — initialized lazily so import never fails on
 # missing API key (lets api.py start up; failures show at /api/run time).
@@ -242,13 +257,26 @@ def _run_one_day(day: int, snapshot: dict) -> list[dict]:
     # acting (rare but happens for borderline pH cases). Hard cap prevents
     # runaway loops.
     for iteration in range(3):
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=messages,
-            tools=AGENT_TOOLS,
-            tool_choice="auto",
-            temperature=0.1,
-        )
+        # Retry on 429 with exponential backoff. Free-tier accounts hit
+        # rate limits easily — better to wait than to drop a day.
+        response = None
+        for attempt in range(3):
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4.1",
+                    messages=messages,
+                    tools=AGENT_TOOLS,
+                    tool_choice="auto",
+                    temperature=0.1,
+                )
+                break
+            except RateLimitError as e:
+                wait_sec = 2.0 * (attempt + 1) ** 2  # 2, 8, 18 sec
+                print(f"[AGENT] day {day} rate-limited (attempt {attempt+1}); "
+                      f"waiting {wait_sec:.1f}s...")
+                time.sleep(wait_sec)
+        if response is None:
+            raise RuntimeError(f"day {day}: rate-limit retries exhausted")
         choice = response.choices[0]
         msg = choice.message
         messages.append(msg)
@@ -327,6 +355,11 @@ def run_agent_for_run(history: dict, run_id: str) -> list[dict]:
             print(f"[AGENT] {run_id}: day {day_value} failed: {e}")
             # On API failure, skip the day rather than aborting the whole run
             continue
+
+        # Pace token consumption to stay under 30K TPM (free-tier cap).
+        # Skip the sleep on the last day since there's nothing after it.
+        if day_idx < n_days - 1:
+            time.sleep(_INTER_DAY_SLEEP_SEC)
 
     all_events.sort(key=lambda e: (e["day"], e["reactorId"]))
     print(f"[AGENT] {run_id}: GPT-4.1 produced {len(all_events)} events")
