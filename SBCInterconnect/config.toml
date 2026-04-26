@@ -1,0 +1,96 @@
+# =============================================================================
+# BioReactorAgent — Edge Compute Configuration
+# Platform: Orange Pi Zero 2 | Python 3.11 | Armbian Bookworm
+# =============================================================================
+
+[opc_ua]
+endpoint  = "opc.tcp://192.168.1.100:4840"
+username  = "bioagent"
+# OPC_UA_PASSWORD is loaded from .env — never stored here
+
+[timing]
+fast_loop_s  = 30       # rule_engine tick interval (seconds)
+gpt_loop_min = 30       # gpt_agent sweep interval (minutes)
+heartbeat_s  = 15       # OPC-UA heartbeat write interval (seconds)
+watchdog_s   = 25       # systemd WATCHDOG=1 notify interval (seconds, must be < WatchdogSec/2)
+subscription_ms = 500   # OPC-UA subscription publishing interval (milliseconds)
+
+[cpp_limits]
+# Critical Process Parameter hard limits — opc_writer validates all writes against these.
+# A write outside these bounds is logged as constraint_block and dropped.
+pH_min         = 6.5
+pH_max         = 7.5
+do_min         = 15.0
+do_max         = 80.0
+temp_min       = 30.0
+temp_max       = 39.0
+agitation_min  = 30
+agitation_max  = 400
+feed_rate_min  = 0.0
+feed_rate_max  = 5.0    # L/h
+
+[data]
+db_path        = "/opt/bioreactor-agent/data/audit.db"
+history_window = 100    # max snapshots retained per reactor in RAM (rolling)
+
+[reactors.R1]
+label           = "Control"
+feed_strategy   = "bolus"
+# OPC-UA setpoint node addresses
+opc_pH_sp       = "ns=2;s=BR1.pH_setpoint"
+opc_temp_sp     = "ns=2;s=BR1.temperature_setpoint"
+opc_agit_sp     = "ns=2;s=BR1.agitation_setpoint"
+opc_feed_rate   = "ns=2;s=BR1.feed_rate"
+opc_heartbeat   = "ns=2;s=Agent.heartbeat"
+# OPC-UA measurement node addresses (subscribed by opc_reader)
+opc_pH          = "ns=2;s=BR1.pH"
+opc_DO          = "ns=2;s=BR1.DO"
+opc_temp        = "ns=2;s=BR1.temperature"
+opc_agit        = "ns=2;s=BR1.agitation"
+opc_offgas_CO2  = "ns=2;s=BR1.offgas_CO2"
+opc_offgas_O2   = "ns=2;s=BR1.offgas_O2"
+
+[reactors.R2]
+label           = "Temp Shift D7"
+feed_strategy   = "bolus"
+opc_pH_sp       = "ns=2;s=BR2.pH_setpoint"
+opc_temp_sp     = "ns=2;s=BR2.temperature_setpoint"
+opc_agit_sp     = "ns=2;s=BR2.agitation_setpoint"
+opc_feed_rate   = "ns=2;s=BR2.feed_rate"
+opc_heartbeat   = "ns=2;s=Agent.heartbeat"
+opc_pH          = "ns=2;s=BR2.pH"
+opc_DO          = "ns=2;s=BR2.DO"
+opc_temp        = "ns=2;s=BR2.temperature"
+opc_agit        = "ns=2;s=BR2.agitation"
+opc_offgas_CO2  = "ns=2;s=BR2.offgas_CO2"
+opc_offgas_O2   = "ns=2;s=BR2.offgas_O2"
+
+[reactors.R3]
+label           = "Continuous Feed"
+feed_strategy   = "continuous"
+opc_pH_sp       = "ns=2;s=BR3.pH_setpoint"
+opc_temp_sp     = "ns=2;s=BR3.temperature_setpoint"
+opc_agit_sp     = "ns=2;s=BR3.agitation_setpoint"
+opc_feed_rate   = "ns=2;s=BR3.feed_rate"
+opc_heartbeat   = "ns=2;s=Agent.heartbeat"
+opc_pH          = "ns=2;s=BR3.pH"
+opc_DO          = "ns=2;s=BR3.DO"
+opc_temp        = "ns=2;s=BR3.temperature"
+opc_agit        = "ns=2;s=BR3.agitation"
+opc_offgas_CO2  = "ns=2;s=BR3.offgas_CO2"
+opc_offgas_O2   = "ns=2;s=BR3.offgas_O2"
+
+[reactors.R4]
+label           = "Continuous + Shift"
+feed_strategy   = "continuous"
+opc_pH_sp       = "ns=2;s=BR4.pH_setpoint"
+opc_temp_sp     = "ns=2;s=BR4.temperature_setpoint"
+opc_agit_sp     = "ns=2;s=BR4.agitation_setpoint"
+opc_feed_rate   = "ns=2;s=BR4.feed_rate"
+opc_heartbeat   = "ns=2;s=Agent.heartbeat"
+opc_pH          = "ns=2;s=BR4.pH"
+opc_DO          = "ns=2;s=BR4.DO"
+opc_temp        = "ns=2;s=BR4.temperature"
+opc_agit        = "ns=2;s=BR4.agitation"
+opc_offgas_CO2  = "ns=2;s=BR4.offgas_CO2"
+opc_offgas_O2   = "ns=2;s=BR4.offgas_O2"

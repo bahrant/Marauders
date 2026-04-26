@@ -1,0 +1,64 @@
+# =============================================================================
+# bioreactor-agent.service
+# systemd unit for BioReactorAgent on Orange Pi Zero 2 / Armbian Bookworm
+#
+# Install:
+#   sudo cp bioreactor-agent.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable bioreactor-agent
+#   sudo systemctl start bioreactor-agent
+#
+# Logs:
+#   journalctl -u bioreactor-agent -f
+# =============================================================================
+
+[Unit]
+Description=BioReactorAgent — Edge OPC-UA to GPT-4o Control Stack
+Documentation=https://github.com/your-org/bioreactor-agent
+After=network-online.target
+Wants=network-online.target
+# Ensure audit DB directory exists before starting
+RequiresMountsFor=/opt/bioreactor-agent/data
+
+[Service]
+# Type=notify enables the systemd watchdog integration via sdnotify.
+# heartbeat.py calls sd_notify("WATCHDOG=1") every ≤30s.
+# If the process fails to notify within WatchdogSec=60s, systemd kills and restarts it.
+Type=notify
+WatchdogSec=60
+
+# Run as a dedicated unprivileged user for GxP security posture
+User=bioagent
+Group=bioagent
+WorkingDirectory=/opt/bioreactor-agent
+
+# Load secrets from .env — never store plaintext credentials in this unit file
+EnvironmentFile=/opt/bioreactor-agent/.env
+
+# Python 3.11 installed via pyenv or apt on Armbian
+ExecStart=/opt/bioreactor-agent/venv/bin/python /opt/bioreactor-agent/main.py
+
+# Restart policy — NFR-03: one task crash must not affect others.
+# main.py handles per-task restarts internally; this catches top-level crashes.
+Restart=on-failure
+RestartSec=10s
+
+# Resource limits for Orange Pi Zero 2 (4-core Cortex-A53, 1GB RAM)
+# NFR-04: sustained CPU < 10% | NFR-05: RAM < 300 MB
+CPUQuota=30%
+MemoryMax=300M
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bioreactor-agent/data
+PrivateTmp=true
+
+# Log to systemd journal with identifier
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bioreactor-agent
+
+[Install]
+WantedBy=multi-user.target

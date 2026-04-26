@@ -1,0 +1,31 @@
+# =============================================================================
+# BioReactorAgent — Edge Compute Dependencies
+# Platform: Orange Pi Zero 2, Armbian Bookworm, Python 3.11
+# Install: pip install -r requirements.txt
+# =============================================================================
+
+# OPC-UA client — asyncua (async, replaces opcua which is sync-only)
+# Provides asyncua.Client, asyncua.ua, SubHandler for push subscriptions (FR-01/FR-02)
+asyncua>=1.1.0
+
+# Async SQLite — all audit writes are non-blocking (FR-27)
+aiosqlite>=0.20.0
+
+# OpenAI SDK — async client for GPT-4o tool-call loop (FR-17/FR-18)
+openai>=1.30.0
+
+# NumPy — EKF matrix math in kalman.py (FR-08)
+# Keep pinned to a version with aarch64 wheel for Orange Pi (Cortex-A53)
+numpy>=1.26.0,<3.0.0
+
+# Environment variable loading — secrets via .env (not hardcoded)
+python-dotenv>=1.0.0
+
+# systemd watchdog notification — heartbeat.py FR-29
+# Gracefully skipped if not installed (heartbeat logs a warning)
+sdnotify>=0.3.2
+
+# TOML parsing — config.toml loading on Python 3.11
+# tomllib is in stdlib for 3.11+; this package is a no-op if tomllib is present
+# Included for compat in case of Python 3.10 fallback on some Armbian images
+tomli>=2.0.0; python_version < "3.11"
